@@ -3,26 +3,103 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "Components/ActorComponent.h"
+#include "Core/Data/BuildableData.h"
+#include "Core/Data/BuildPreviewStatus.h"
 #include "BuildableManagerComponent.generated.h"
 
+class UCameraComponent;
+DECLARE_LOG_CATEGORY_EXTERN(LogBuildableComponent, Log, All);
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+DECLARE_DELEGATE(BuildableComponentDelegate)
+
+UCLASS(Blueprintable, BlueprintType, ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class BUILDSYSTEM_API UBuildableManagerComponent : public UActorComponent
 {
 	GENERATED_BODY()
+private:
+	FGameplayTagContainer BuildableTags;
 
-public:	
+	bool bIsBuildModeActive;
+
+	FTransform BuildPreviewTransform;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"))
+	UStaticMeshComponent* BuildPreviewComponent;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"))
+	float BuildPreviewTraceTickRate = 0.01f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"))
+	float BuildPreviewTraceDistance = 1200.f;
+
+	EBuildPreviewStatus BuildStatus;
+
+	int CurrentBuildPreviewIndex;
+
+	UCameraComponent* CameraComponent;
+
+public:
 	// Sets default values for this component's properties
 	UBuildableManagerComponent();
+
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	bool bEnableDebug = false;
 
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 
-public:	
+	void UpdateAllBuildableTags();
+
+	void InitializeBuildPreview();
+
+	FBuildableData GetBuildableDataAtIndex(int Index, bool& HasFoundRow) const;
+
+	void BuildPreviewTrace();
+
+	void ActivateBuildPreviewTrace();
+
+	void SetBuildPreviewTransform();
+
+	FTimerHandle BuildPreviewTraceTimer;
+
+	void OnBuildPreviewTraceTick();
+
+	void UpdateBuildPreviewValidity(EBuildPreviewStatus PreviewStatus, const FTransform& PreviewTransform);
+
+	int GetAllBuildableTagsLength() const;
+
+	void UpdateBuildPreviewMeshByIndex(int Index);
+public:
+	void InitializeBuildableManagerComponent(UCameraComponent* Camera);
+
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-		
+	UFUNCTION(BlueprintCallable)
+	void TryPrintAllBuildableTags() const;
+
+	UFUNCTION(BlueprintCallable)
+	bool IsBuildModeActive() const { return bIsBuildModeActive; }
+
+	UFUNCTION(BlueprintCallable)
+	int GetCurrentBuildPreviewIndex() const { return CurrentBuildPreviewIndex; }
+
+	UFUNCTION(BlueprintCallable)
+	void ActivateBuildMode();
+
+	UFUNCTION(BlueprintCallable)
+	void DeActivateBuildMode();
+
+	UFUNCTION(BlueprintCallable)
+	void ToggleBuildMode();
+
+	UFUNCTION(BlueprintCallable)
+	void UpdateCurrentBuildPreviewIndex(EBuildPreviewUpdateMethod Method);
+
+	UFUNCTION(BlueprintCallable)
+	void TryPlaceBuildableByIndex(int Index = -1);
 };

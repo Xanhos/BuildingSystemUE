@@ -17,8 +17,6 @@ ABuildable_Base::ABuildable_Base()
 	}
 
 	FCoreDelegates::OnBeginFrame.AddUObject(this, &ABuildable_Base::InitializeMesh);
-
-
 }
 
 // Called when the game starts or when spawned
@@ -30,6 +28,7 @@ void ABuildable_Base::BeginPlay()
 
 void ABuildable_Base::InitializeMesh() const
 {
+	FCoreDelegates::OnBeginFrame.RemoveAll(this);
 	bool FoundMesh = false;
 	UStaticMesh* Mesh = UBuildingSystemFL::FL_GetBuildableMeshByTag(Tag, FoundMesh);
 	if (FoundMesh)

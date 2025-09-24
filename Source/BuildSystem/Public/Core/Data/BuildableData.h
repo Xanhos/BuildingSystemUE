@@ -19,24 +19,24 @@ struct BUILDSYSTEM_API FBuildableData : public FTableRowBase
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FGameplayTag Tag;
+	FGameplayTag Tag = {};
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UStaticMesh* Mesh;
+	UStaticMesh* Mesh = {};
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AActor> Class;
+	TSubclassOf<AActor> Class = {};
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TEnumAsByte<ETraceTypeQuery> TraceChannel;
+	TEnumAsByte<ETraceTypeQuery> TraceChannel = {};
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FSlotData> Cost;
+	TArray<FSlotData> Cost = {};
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TMap<FGameplayTag, float> Attributes;
+	TMap<FGameplayTag, float> Attributes = {};
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FInstancedStruct CustomData;
+	FInstancedStruct CustomData = {};
 
 };
