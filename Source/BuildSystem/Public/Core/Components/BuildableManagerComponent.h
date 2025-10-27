@@ -19,6 +19,8 @@ class BUILDSYSTEM_API UBuildableManagerComponent : public UActorComponent
 {
 	GENERATED_BODY()
 private:
+	FBuildableSocketStruct SnappingSocket;
+	
 	FGameplayTagContainer BuildableTags;
 
 	bool bIsBuildModeActive;
@@ -38,7 +40,10 @@ private:
 
 	int CurrentBuildPreviewIndex;
 
+	UPROPERTY()
 	UCameraComponent* CameraComponent;
+
+	bool bSnappingIsActive = false;
 
 public:
 	// Sets default values for this component's properties
@@ -62,17 +67,21 @@ protected:
 
 	void ActivateBuildPreviewTrace();
 
-	void SetBuildPreviewTransform();
+	void SetBuildPreviewTransform(const FTransform& PreviewTransform);
 
 	FTimerHandle BuildPreviewTraceTimer;
 
 	void OnBuildPreviewTraceTick();
 
-	void UpdateBuildPreviewValidity(EBuildPreviewStatus PreviewStatus, const FTransform& PreviewTransform);
+	void UpdateBuildPreviewValidity(EBuildPreviewStatus PreviewStatus);
 
 	int GetAllBuildableTagsLength() const;
 
 	void UpdateBuildPreviewMeshByIndex(int Index);
+
+	void SpawnBuild(TSubclassOf<AActor> ActorToSpawn);
+
+	bool IsOverlappingBuildPreview();
 public:
 	void InitializeBuildableManagerComponent(UCameraComponent* Camera);
 
@@ -96,6 +105,10 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void ToggleBuildMode();
+
+
+	UFUNCTION(BlueprintCallable)
+	void ToggleSnapping();
 
 	UFUNCTION(BlueprintCallable)
 	void UpdateCurrentBuildPreviewIndex(EBuildPreviewUpdateMethod Method);

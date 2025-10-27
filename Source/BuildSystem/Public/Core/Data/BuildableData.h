@@ -6,6 +6,7 @@
 #include "SlotData.h"
 #include "AttributeData.h"
 #include "GameplayTagContainer.h"
+#include "Core/Interfaces/IBuildable.h"
 #include "StructUtils/InstancedStruct.h"
 //#include "InstancedStruct.h"
 #include "BuildableData.generated.h"

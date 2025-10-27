@@ -3,6 +3,7 @@
 
 #include "Core/Class/Buildable_Base.h"
 #include "BuildingSystemFL.h"
+#include "Kismet/GameplayStatics.h"
 
 // Sets default values
 ABuildable_Base::ABuildable_Base()
@@ -24,6 +25,46 @@ void ABuildable_Base::BeginPlay()
 {
 	Super::BeginPlay();
 
+
+	for (EBuildableSocketType i = EBuildableSocketType::Forward; i < EBuildableSocketType::COUNT; ++i)
+	{
+		FVector Socket;
+		FVector Extent = BuildableMesh->Bounds.BoxExtent;
+		switch (i)
+		{
+			case EBuildableSocketType::Forward:
+			Socket = FVector{Extent.X *2  ,0,-Extent.Z} + GetActorLocation();
+			break;
+			case EBuildableSocketType::Backward:
+			Socket= FVector{(Extent.X ) *2 * -1,0,-Extent.Z} + GetActorLocation();
+			break;
+			case EBuildableSocketType::Right:
+			Socket= FVector{0,(Extent.X )*2  * -1,-Extent.Z} + GetActorLocation();
+			break;
+			case EBuildableSocketType::Left:
+			Socket= FVector{0,Extent.X *2 ,-Extent.Z} + GetActorLocation();
+			break;
+			case EBuildableSocketType::Up:
+			Socket= FVector{0,0,Extent.Z}  + GetActorLocation();
+			break;
+			case EBuildableSocketType::Down:
+			Socket= FVector{0,0,-Extent.Z}  + GetActorLocation();
+			break;
+			
+			default:
+			continue;
+			break;
+		}
+		SocketArray.Add({Socket, static_cast<EBuildableSocketType>(i)});
+	}
+
+    UBoxComponent* BoxComponent = NewObject<UBoxComponent>(this, UBoxComponent::StaticClass(), TEXT("SnapBox"));
+	BoxComponent->RegisterComponent();
+	BoxComponent->AttachToComponent(BuildableMesh, FAttachmentTransformRules::KeepRelativeTransform);
+	BoxComponent->SetBoxExtent(BuildableMesh->Bounds.BoxExtent);
+	BoxComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	BoxComponent->SetCollisionResponseToChannels(BuildableMesh->GetCollisionResponseToChannels());
+	
 }
 
 void ABuildable_Base::InitializeMesh() const
@@ -35,6 +76,7 @@ void ABuildable_Base::InitializeMesh() const
 	{
 		BuildableMesh->SetStaticMesh(Mesh);
 	}
+
 }
 
 // Called every frame
@@ -49,8 +91,23 @@ FGameplayTag ABuildable_Base::IF_GetBuildableTag_Implementation() const
 	return Tag;
 }
 
-TArray<UPrimitiveComponent*> ABuildable_Base::IF_GetSocket_Implementation() const
+TArray<FBuildableSocketStruct> ABuildable_Base::IF_GetSocket_Implementation() const
 {
-	return TArray<UPrimitiveComponent*>();
+	return SocketArray;
 }
 
+UStaticMeshComponent* ABuildable_Base::IF_GetStaticMesh_Implementation() const
+{
+	return BuildableMesh;
+}
+
+void ABuildable_Base::IF_SnapToSocket_Implementation(FBuildableSocketStruct Socket)
+{
+	ProcessSnappingPos(Socket.Type);
+}
+
+FVector ABuildable_Base::ProcessSnappingPos(EBuildableSocketType Type)
+{
+	return GetActorLocation();
+}
+ 

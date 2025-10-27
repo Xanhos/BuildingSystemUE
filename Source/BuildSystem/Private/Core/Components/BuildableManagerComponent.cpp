@@ -3,8 +3,14 @@
 
 #include "Core/Components/BuildableManagerComponent.h"
 
+#include <filesystem>
+#include <winsock2.h>
+
 #include "BuildingSystemFL.h" 
 #include "Camera/CameraComponent.h"
+#include "Core/Class/Buildable_Base.h"
+#include "GameFramework/Actor.h"
+#include "Engine/TargetPoint.h"
 
 DEFINE_LOG_CATEGORY(LogBuildableComponent);
 
@@ -48,8 +54,9 @@ void UBuildableManagerComponent::InitializeBuildPreview()
 		BuildPreviewComponent = Cast<UStaticMeshComponent>(Owner->AddComponentByClass(UStaticMeshComponent::StaticClass(), false, {}, true));
 		if (BuildPreviewComponent)
 		{
-			BuildPreviewTrace();
-			SetBuildPreviewTransform();
+			BuildPreviewComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+			BuildPreviewComponent->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Overlap);
+			BuildPreviewTrace(); 
 			BuildPreviewComponent->RegisterComponent();
 			BuildPreviewComponent->AttachToComponent(Owner->GetRootComponent(),
 				FAttachmentTransformRules::KeepWorldTransform);
@@ -88,11 +95,11 @@ void UBuildableManagerComponent::BuildPreviewTrace()
 	}
 
 
-	FVector Start = GetOwner()->GetActorLocation();           // Point de départ
-	FVector ForwardVector = CameraComponent->GetForwardVector(); // Direction
-	FVector End = Start + (ForwardVector * BuildPreviewTraceDistance);  // 1000 unités devant
+	FVector Start = GetOwner()->GetActorLocation();           
+	FVector ForwardVector = CameraComponent->GetForwardVector(); 
+	FVector End = Start + (ForwardVector * BuildPreviewTraceDistance);  
 
-	FHitResult HitResult;                         // Stocke les infos du hit
+	FHitResult HitResult;                         
 	FCollisionQueryParams Params;
 	Params.bTraceComplex = false;
 	Params.AddIgnoredActor(GetOwner());
@@ -112,13 +119,62 @@ void UBuildableManagerComponent::BuildPreviewTrace()
 	FTransform LocationTransform{};
 	if (bHit)
 	{
-		LocationTransform.SetLocation(HitResult.Location);
-		UpdateBuildPreviewValidity(EBuildPreviewStatus::CanPlace, LocationTransform);
-		return;
-	}
+		IBuildable* Buildable = Cast<IBuildable>(HitResult.GetActor());
+		 
+		
+		if (Buildable && bSnappingIsActive)
+		{
+			auto SetupTransformForOverlapPreview = [this](const FVector& Pos)
+			{
+				FTransform NewTransform = BuildPreviewTransform;
+				NewTransform.SetLocation(Pos);
+				SetBuildPreviewTransform(NewTransform);
+			};
+			
+			FVector NewPos = HitResult.Location;
+			for (FBuildableSocketStruct& Socket : Buildable->Execute_IF_GetSocket(HitResult.GetActor()))
+			{ 
+				if (NewPos == HitResult.Location)
+				{
+					SetupTransformForOverlapPreview(Socket.Position);
+					if (!IsOverlappingBuildPreview())
+					{
+						NewPos = Socket.Position;
+						SnappingSocket = Socket;
+					}
+					continue;
+				}
+				
+				if (FVector::Distance(Socket.Position, HitResult.Location) < FVector::Distance(HitResult.Location, NewPos))
+				{
+					SetupTransformForOverlapPreview(Socket.Position);
+					if (!IsOverlappingBuildPreview())
+					{
+						NewPos = Socket.Position;
+						SnappingSocket = Socket;
+					}					
+				}
+			}
+			
 
-	LocationTransform.SetLocation(HitResult.TraceEnd);
-	UpdateBuildPreviewValidity(EBuildPreviewStatus::CanNotPlace, LocationTransform);
+			LocationTransform.SetLocation(NewPos);			
+		}
+		else
+		{
+			LocationTransform.SetLocation(HitResult.Location);
+			SnappingSocket.Type = EBuildableSocketType::INVALID;
+		}
+	}
+	else
+	{
+		LocationTransform.SetLocation(HitResult.TraceEnd);	
+		SnappingSocket.Type = EBuildableSocketType::INVALID;	
+	}
+	SetBuildPreviewTransform(LocationTransform);
+
+	bool bCanPlace = bHit && !IsOverlappingBuildPreview();
+	
+	UpdateBuildPreviewValidity(bCanPlace ? EBuildPreviewStatus::CanPlace : EBuildPreviewStatus::CanNotPlace); 
 }
 
 
@@ -132,27 +188,28 @@ void UBuildableManagerComponent::ActivateBuildPreviewTrace()
 		true);
 }
 
-void UBuildableManagerComponent::SetBuildPreviewTransform()
+void UBuildableManagerComponent::SetBuildPreviewTransform(const FTransform& Transform)
 {
 	if (BuildPreviewComponent)
 	{
+		BuildPreviewTransform = Transform;
+		BuildPreviewTransform.SetLocation(BuildPreviewTransform.GetLocation() + FVector(0, 0, BuildPreviewComponent->Bounds.BoxExtent.Z));
 		BuildPreviewComponent->SetWorldTransform(BuildPreviewTransform);
 	}
 }
 
 void UBuildableManagerComponent::OnBuildPreviewTraceTick()
 {
-	BuildPreviewTrace();
-	SetBuildPreviewTransform();
+	BuildPreviewTrace(); 
 }
 
-void UBuildableManagerComponent::UpdateBuildPreviewValidity(EBuildPreviewStatus PreviewStatus, const FTransform& Transform)
+void UBuildableManagerComponent::UpdateBuildPreviewValidity(EBuildPreviewStatus PreviewStatus)
 {
 	if (!BuildPreviewComponent)
 	{
 		return;
 	}
-	BuildPreviewTransform = Transform;
+
 	BuildStatus = PreviewStatus;
 	for (size_t i = 0; i < BuildPreviewComponent->GetNumMaterials(); i++)
 	{
@@ -208,7 +265,7 @@ void UBuildableManagerComponent::TryPlaceBuildableByIndex(int Index)
 	FBuildableData Data = GetBuildableDataAtIndex(Index, bHasFoundRow);
 	if (bHasFoundRow)
 	{
-		GetWorld()->SpawnActor<AActor>(Data.Class, BuildPreviewTransform);
+		SpawnBuild(Data.Class);
 	}
 }
 
@@ -225,6 +282,18 @@ void UBuildableManagerComponent::UpdateBuildPreviewMeshByIndex(int Index)
 	{
 		BuildPreviewComponent->SetStaticMesh(Data.Mesh);
 	}
+}
+
+void UBuildableManagerComponent::SpawnBuild(TSubclassOf<AActor> ActorToSpawn)
+{ 
+	ABuildable_Base* Buildable = GetWorld()->SpawnActor<ABuildable_Base>(ActorToSpawn, BuildPreviewTransform);
+}
+
+bool UBuildableManagerComponent::IsOverlappingBuildPreview()
+{
+	TArray<AActor*> OverlapActors;
+	BuildPreviewComponent->GetOverlappingActors(OverlapActors);
+	return !BuildPreviewComponent->GetOverlapInfos().IsEmpty();
 }
 
 
@@ -285,4 +354,9 @@ void UBuildableManagerComponent::ToggleBuildMode()
 	{
 		DeActivateBuildMode();
 	}
+}
+
+void UBuildableManagerComponent::ToggleSnapping()
+{
+	bSnappingIsActive = !bSnappingIsActive;
 }

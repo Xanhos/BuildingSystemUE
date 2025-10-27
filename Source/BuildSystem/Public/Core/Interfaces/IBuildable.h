@@ -10,6 +10,39 @@
 /**
  *
  */
+
+UENUM(BlueprintType) 
+enum class EBuildableSocketType : uint8
+{
+	Forward = 0,
+	Backward,
+	Right,
+	Left,
+	Up,
+	Down,
+	COUNT,
+	INVALID
+	
+};
+
+inline EBuildableSocketType& operator++(EBuildableSocketType& Socket)
+{ 
+	Socket = static_cast<EBuildableSocketType>(static_cast<int>(Socket) + 1);
+	return Socket;
+}
+
+USTRUCT(BlueprintType)
+struct FBuildableSocketStruct
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector Position;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EBuildableSocketType Type;
+};
+
+
 UINTERFACE(Blueprintable)
 class BUILDSYSTEM_API UBuildable : public UInterface
 {
@@ -25,5 +58,11 @@ public:
 	FGameplayTag IF_GetBuildableTag() const;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	TArray<UPrimitiveComponent*> IF_GetSocket() const;
+	TArray<FBuildableSocketStruct> IF_GetSocket() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	UStaticMeshComponent* IF_GetStaticMesh() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void IF_SnapToSocket(FBuildableSocketStruct Socket);
 };
