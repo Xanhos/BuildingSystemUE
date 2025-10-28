@@ -19,7 +19,7 @@ class BUILDSYSTEM_API UBuildableManagerComponent : public UActorComponent
 {
 	GENERATED_BODY()
 private:
-	FBuildableSocketStruct SnappingSocket;
+	FBuildingSocket SnappingSocket;
 	
 	FGameplayTagContainer BuildableTags;
 

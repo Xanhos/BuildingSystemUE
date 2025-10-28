@@ -13,5 +13,5 @@ UCLASS(Abstract)
 class BUILDSYSTEM_API ABuildable_Wall_Base : public ABuildable_Base
 {
 	GENERATED_BODY()
-
+	virtual void GenerateSockets() override;
 };

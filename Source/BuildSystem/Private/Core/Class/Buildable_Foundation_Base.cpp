@@ -3,32 +3,18 @@
 
 #include "Core/Class/Buildable_Foundation_Base.h"
 
-FVector ABuildable_Foundation_Base::ProcessSnappingPos(EBuildableSocketType Type)
+void ABuildable_Foundation_Base::GenerateSockets()
 {
-	Super::ProcessSnappingPos(Type);
-	FVector NewLocation = GetActorLocation();
-	
-	switch (Type)
-	{
-	case EBuildableSocketType::Forward:
-		NewLocation +=  FVector{BuildableMesh->Bounds.BoxExtent.X,0,-BuildableMesh->Bounds.BoxExtent.Z};
-		break;
-	case EBuildableSocketType::Backward:
-		NewLocation +=  FVector{-BuildableMesh->Bounds.BoxExtent.X,0,-BuildableMesh->Bounds.BoxExtent.Z};
-		break;
-	case EBuildableSocketType::Right:
-		NewLocation +=  FVector{0,BuildableMesh->Bounds.BoxExtent.X,-BuildableMesh->Bounds.BoxExtent.Z};
-		break;
-	case EBuildableSocketType::Left:
-		NewLocation +=  FVector{0,-BuildableMesh->Bounds.BoxExtent.X,-BuildableMesh->Bounds.BoxExtent.Z};
-		break;
-	case EBuildableSocketType::Up:
-		break;
-	case EBuildableSocketType::Down:
-		break;
-	case EBuildableSocketType::COUNT:
-		break;
-	default: ;
-	}
-	return NewLocation;
+	Super::GenerateSockets();
+
+	FVector Extend = BuildableMesh->Bounds.BoxExtent;
+	const FRotator& ZeroRota = FRotator::ZeroRotator;
+	using Socket = ESocketConnectionType;
+     
+	AddSocket({Extend.X, 0, Extend.Z}, ZeroRota, Socket::Horizontal, {Socket::Horizontal});
+	AddSocket({-Extend.X, 0, Extend.Z}, ZeroRota, Socket::Horizontal, {Socket::Horizontal});
+	AddSocket({0, -Extend.Y, Extend.Z}, ZeroRota, Socket::Horizontal, {Socket::Horizontal}); 
+	AddSocket({0, Extend.Y, Extend.Z}, ZeroRota, Socket::Horizontal, {Socket::Horizontal});  
+     
+	AddSocket({0, 0, Extend.Z}, ZeroRota, Socket::Ground, {Socket::Vertical});  
 }

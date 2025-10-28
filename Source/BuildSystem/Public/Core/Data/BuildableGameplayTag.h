@@ -1,0 +1,51 @@
+﻿// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "CoreMinimal.h" 
+#include "NativeGameplayTags.h"
+
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable)
+
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Foundation)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Door)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Window)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Wall)
+
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Wall_Window)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Wall_Standard)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Wall_Door)
+
+
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Foundation_Wood)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Foundation_Metal)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Foundation_Stone)
+
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Door_Wood)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Door_Metal)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Door_Stone)
+
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Wall_Window_Wood)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Wall_Window_Metal)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Wall_Window_Stone)
+
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Wall_Door_Wood)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Wall_Door_Metal)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Wall_Door_Stone)
+
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Wall_Standard_Wood)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Wall_Standard_Metal)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Wall_Standard_Stone)
+
+
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Window_Wood)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Window_Metal)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buildable_Window_Stone)
+
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attribute)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attribute_Health)
+
+/**
+ * 
+ */
+ 

@@ -132,7 +132,7 @@ void UBuildableManagerComponent::BuildPreviewTrace()
 			};
 			
 			FVector NewPos = HitResult.Location;
-			for (FBuildableSocketStruct& Socket : Buildable->Execute_IF_GetSocket(HitResult.GetActor()))
+			for (FBuildingSocket& Socket : Buildable->Execute_IF_GetSocket(HitResult.GetActor(), ))
 			{ 
 				if (NewPos == HitResult.Location)
 				{

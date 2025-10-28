@@ -11,35 +11,48 @@
  *
  */
 
-UENUM(BlueprintType) 
-enum class EBuildableSocketType : uint8
+UENUM(BlueprintType)
+enum class ESocketConnectionType : uint8
 {
-	Forward = 0,
-	Backward,
-	Right,
-	Left,
-	Up,
-	Down,
-	COUNT,
-	INVALID
-	
+	Ground,      
+	Vertical,    
+	Horizontal,  
+	Ceiling,     
+	Any          
 };
 
-inline EBuildableSocketType& operator++(EBuildableSocketType& Socket)
-{ 
-	Socket = static_cast<EBuildableSocketType>(static_cast<int>(Socket) + 1);
-	return Socket;
-}
-
 USTRUCT(BlueprintType)
-struct FBuildableSocketStruct
+struct FBuildingSocket
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector Position;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EBuildableSocketType Type;
+	UPROPERTY(EditAnywhere)
+	FTransform Transform;
+
+	UPROPERTY(EditAnywhere)
+	ESocketConnectionType Type;
+	
+	UPROPERTY(EditAnywhere)
+	TArray<ESocketConnectionType> AcceptedTypes;
+
+	UPROPERTY(EditAnywhere)
+	bool bIsOccupied = false;
+
+	UPROPERTY(EditAnywhere)
+	int Index = 0;
+
+	bool operator==(const FBuildingSocket& other) const
+	{
+		if (other.Type == ESocketConnectionType::Any || Type == ESocketConnectionType::Any)
+		{
+			return true;
+		}
+     
+		bool bAAcceptsB = other.AcceptedTypes.Contains(Type);
+		bool bBAcceptsA = AcceptedTypes.Contains(other.Type);
+    
+		return bAAcceptsB && bBAcceptsA;
+	}
 };
 
 
@@ -58,11 +71,15 @@ public:
 	FGameplayTag IF_GetBuildableTag() const;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	TArray<FBuildableSocketStruct> IF_GetSocket() const;
+	TArray<FBuildingSocket> IF_GetSocket(ESocketConnectionType Type) const;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	UStaticMeshComponent* IF_GetStaticMesh() const;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void IF_SnapToSocket(FBuildableSocketStruct Socket);
+	void IF_SnapToSocket(int Index,FBuildingSocket Socket);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	TArray<FBuildingSocket> IF_GetAvailableSockets();
+ 
 };

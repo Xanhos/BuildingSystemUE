@@ -26,37 +26,7 @@ void ABuildable_Base::BeginPlay()
 	Super::BeginPlay();
 
 
-	for (EBuildableSocketType i = EBuildableSocketType::Forward; i < EBuildableSocketType::COUNT; ++i)
-	{
-		FVector Socket;
-		FVector Extent = BuildableMesh->Bounds.BoxExtent;
-		switch (i)
-		{
-			case EBuildableSocketType::Forward:
-			Socket = FVector{Extent.X *2  ,0,-Extent.Z} + GetActorLocation();
-			break;
-			case EBuildableSocketType::Backward:
-			Socket= FVector{(Extent.X ) *2 * -1,0,-Extent.Z} + GetActorLocation();
-			break;
-			case EBuildableSocketType::Right:
-			Socket= FVector{0,(Extent.X )*2  * -1,-Extent.Z} + GetActorLocation();
-			break;
-			case EBuildableSocketType::Left:
-			Socket= FVector{0,Extent.X *2 ,-Extent.Z} + GetActorLocation();
-			break;
-			case EBuildableSocketType::Up:
-			Socket= FVector{0,0,Extent.Z}  + GetActorLocation();
-			break;
-			case EBuildableSocketType::Down:
-			Socket= FVector{0,0,-Extent.Z}  + GetActorLocation();
-			break;
-			
-			default:
-			continue;
-			break;
-		}
-		SocketArray.Add({Socket, static_cast<EBuildableSocketType>(i)});
-	}
+	GenerateSockets();
 
     UBoxComponent* BoxComponent = NewObject<UBoxComponent>(this, UBoxComponent::StaticClass(), TEXT("SnapBox"));
 	BoxComponent->RegisterComponent();
@@ -65,6 +35,17 @@ void ABuildable_Base::BeginPlay()
 	BoxComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	BoxComponent->SetCollisionResponseToChannels(BuildableMesh->GetCollisionResponseToChannels());
 	
+}
+
+void ABuildable_Base::AddSocket(const FVector& Location, const FRotator& Rotation,
+	ESocketConnectionType ConnectionType, const TArray<ESocketConnectionType>& AcceptedConnection, FVector Scale)
+{
+	FBuildingSocket BuildingSocket;
+	BuildingSocket.Transform = FTransform(Rotation,Location, Scale);
+	BuildingSocket.Type = ConnectionType;
+	BuildingSocket.AcceptedTypes = AcceptedConnection;
+	BuildingSocket.Index = SocketArray.Num();
+	SocketArray.Add(BuildingSocket);
 }
 
 void ABuildable_Base::InitializeMesh() const
@@ -79,6 +60,10 @@ void ABuildable_Base::InitializeMesh() const
 
 }
 
+void ABuildable_Base::GenerateSockets()
+{
+}
+
 // Called every frame
 void ABuildable_Base::Tick(float DeltaTime)
 {
@@ -91,9 +76,26 @@ FGameplayTag ABuildable_Base::IF_GetBuildableTag_Implementation() const
 	return Tag;
 }
 
-TArray<FBuildableSocketStruct> ABuildable_Base::IF_GetSocket_Implementation() const
+TArray<FBuildingSocket> ABuildable_Base::IF_GetSocket_Implementation(ESocketConnectionType Type) const
 {
-	return SocketArray;
+	TArray<FBuildingSocket> SocketsOutput;
+	Algo::CopyIf(SocketArray, SocketsOutput, [Type](const FBuildingSocket& Socket)
+	{
+		return Socket.AcceptedTypes.Contains(Type);
+	});
+
+	return SocketsOutput;
+}
+
+TArray<FBuildingSocket> ABuildable_Base::IF_GetAvailableSockets_Implementation()
+{
+	TArray<FBuildingSocket> SocketsOutput;
+	Algo::CopyIf(SocketArray, SocketsOutput, [](const FBuildingSocket& Socket)
+	{
+		return !Socket.bIsOccupied;
+	});
+
+	return SocketsOutput;
 }
 
 UStaticMeshComponent* ABuildable_Base::IF_GetStaticMesh_Implementation() const
@@ -101,12 +103,12 @@ UStaticMeshComponent* ABuildable_Base::IF_GetStaticMesh_Implementation() const
 	return BuildableMesh;
 }
 
-void ABuildable_Base::IF_SnapToSocket_Implementation(FBuildableSocketStruct Socket)
+void ABuildable_Base::IF_SnapToSocket_Implementation(FBuildingSocket Socket)
 {
-	ProcessSnappingPos(Socket.Type);
+	ProcessSnappingPos(Socket);
 }
 
-FVector ABuildable_Base::ProcessSnappingPos(EBuildableSocketType Type)
+FVector ABuildable_Base::ProcessSnappingPos(FBuildingSocket Socket)
 {
 	return GetActorLocation();
 }
