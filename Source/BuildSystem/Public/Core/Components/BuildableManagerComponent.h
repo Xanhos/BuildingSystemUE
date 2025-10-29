@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "Components/ActorComponent.h"
+#include "Core/Class/Buildable_Base.h"
 #include "Core/Data/BuildableData.h"
 #include "Core/Data/BuildPreviewStatus.h"
 #include "BuildableManagerComponent.generated.h"
@@ -18,8 +19,8 @@ UCLASS(Blueprintable, BlueprintType, ClassGroup = (Custom), meta = (BlueprintSpa
 class BUILDSYSTEM_API UBuildableManagerComponent : public UActorComponent
 {
 	GENERATED_BODY()
-private:
-	FBuildingSocket SnappingSocket;
+private: 
+	TPair<UBuildableSocket*, UBuildableSocket*> SnappingSocketPair;
 	
 	FGameplayTagContainer BuildableTags;
 
@@ -28,7 +29,7 @@ private:
 	FTransform BuildPreviewTransform;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"))
-	UStaticMeshComponent* BuildPreviewComponent;
+	ABuildable_Base* BuildPreviewActor;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (AllowPrivateAccess = "true"))
 	float BuildPreviewTraceTickRate = 0.01f;
@@ -59,6 +60,8 @@ protected:
 
 	void UpdateAllBuildableTags();
 
+	void DeInitializeBuildPreview();
+	
 	void InitializeBuildPreview();
 
 	FBuildableData GetBuildableDataAtIndex(int Index, bool& HasFoundRow) const;

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "Components/BoxComponent.h"
+#include "Core/Components/BuildableSocket.h"
 #include "Core/Interfaces/IBuildable.h"
 #include "Engine/TargetPoint.h"
 #include "GameFramework/Actor.h"
@@ -21,18 +22,28 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
-
-	void AddSocket(const FVector& Location,const FRotator& Rotation, ESocketConnectionType ConnectionType,const TArray<ESocketConnectionType>& AcceptedConnection, FVector Scale = FVector{1,1,1});
-	
+ 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> BuildableMesh;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USceneComponent> BuildableRoot;
+	
+	UPROPERTY(BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	UBoxComponent* BoxComp;
+	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
-	TArray<FBuildingSocket> SocketArray;
+	TArray<TObjectPtr<UBuildableSocket>> SocketArray;
 	
 	void InitializeMesh() const;
 
-	virtual void GenerateSockets();
+	void GenerateSockets();
+
+	virtual void OnGenerateSockets();
+
+	bool GetClosestSocket(UBuildableSocket* OtherSocket,const float MaxDistance ,UBuildableSocket*& OutSocket
+		, const TFunction<bool(UBuildableSocket*, UBuildableSocket*)>& Predicate = [](auto f, auto d){return true;});
+	
 public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -42,13 +53,25 @@ public:
 
 	virtual FGameplayTag IF_GetBuildableTag_Implementation() const override;
 
-	virtual TArray<FBuildingSocket> IF_GetSocket_Implementation(ESocketConnectionType Type) const override;
+	virtual TArray<UBuildableSocket*> IF_GetSocket_Implementation(ESocketConnectionType Type) const override;
 
-	virtual TArray<FBuildingSocket> IF_GetAvailableSockets_Implementation() override;
+	virtual TArray<UBuildableSocket*> IF_GetAvailableSockets_Implementation() override;
 
 	virtual UStaticMeshComponent* IF_GetStaticMesh_Implementation() const override;
 
-	virtual void IF_SnapToSocket_Implementation(FBuildingSocket Socket) override;
+	virtual bool IF_GetClosestSocket_Implementation(UBuildableSocket* OtherSocket, float MaxDistance, UBuildableSocket*& OutSocket) override;
 	
-	virtual FVector ProcessSnappingPos(FBuildingSocket Socket);
+	virtual FVector ProcessSnappingPos(UBuildableSocket* Socket);
+
+	void SetIsPreviewBuild(bool bIsPreview);
+
+	void DrawDebugSocket();
+ 
+	bool TrySnapToClosestBuildableSocket(ABuildable_Base* OtherBuilding,  UBuildableSocket*& OutSocket, UBuildableSocket*& OutOtherSocket,
+		const TFunction<bool(UBuildableSocket*, UBuildableSocket*)>& Predicate = [](auto f, auto d){return true;});
+ 
+	FVector GetSnapPosition(UBuildableSocket* Socket, UBuildableSocket* OtherSocket);
+	
+	// If you also need rotation alignment:
+	FTransform GetSnapTransform(UBuildableSocket* Socket, UBuildableSocket* OtherSocket);
 };

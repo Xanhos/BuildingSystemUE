@@ -4,6 +4,7 @@
 #include "Core/Class/Buildable_Base.h"
 #include "BuildingSystemFL.h"
 #include "Kismet/GameplayStatics.h"
+#include <limits>
 
 // Sets default values
 ABuildable_Base::ABuildable_Base()
@@ -11,10 +12,16 @@ ABuildable_Base::ABuildable_Base()
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
+	BuildableRoot = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	if (BuildableRoot)
+	{
+		RootComponent = BuildableRoot;
+	}
+	
 	BuildableMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BuildableMesh"));
 	if (BuildableMesh)
 	{
-		RootComponent = BuildableMesh;
+		BuildableMesh->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
 	}
 
 	FCoreDelegates::OnBeginFrame.AddUObject(this, &ABuildable_Base::InitializeMesh);
@@ -25,29 +32,19 @@ void ABuildable_Base::BeginPlay()
 {
 	Super::BeginPlay();
 
-
+	BuildableMesh->SetRelativeLocation({0,0,BuildableMesh->Bounds.BoxExtent.Z});
+	
 	GenerateSockets();
 
-    UBoxComponent* BoxComponent = NewObject<UBoxComponent>(this, UBoxComponent::StaticClass(), TEXT("SnapBox"));
-	BoxComponent->RegisterComponent();
-	BoxComponent->AttachToComponent(BuildableMesh, FAttachmentTransformRules::KeepRelativeTransform);
-	BoxComponent->SetBoxExtent(BuildableMesh->Bounds.BoxExtent);
-	BoxComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	BoxComponent->SetCollisionResponseToChannels(BuildableMesh->GetCollisionResponseToChannels());
+	BoxComp = NewObject<UBoxComponent>(this, UBoxComponent::StaticClass(), TEXT("SnapBox"));
+	BoxComp->RegisterComponent();
+	BoxComp->AttachToComponent(GetRootComponent(), FAttachmentTransformRules::SnapToTargetIncludingScale);
+	BoxComp->SetBoxExtent(BuildableMesh->Bounds.BoxExtent);
+	BoxComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	BoxComp->SetCollisionResponseToChannels(BuildableMesh->GetCollisionResponseToChannels());
 	
 }
-
-void ABuildable_Base::AddSocket(const FVector& Location, const FRotator& Rotation,
-	ESocketConnectionType ConnectionType, const TArray<ESocketConnectionType>& AcceptedConnection, FVector Scale)
-{
-	FBuildingSocket BuildingSocket;
-	BuildingSocket.Transform = FTransform(Rotation,Location, Scale);
-	BuildingSocket.Type = ConnectionType;
-	BuildingSocket.AcceptedTypes = AcceptedConnection;
-	BuildingSocket.Index = SocketArray.Num();
-	SocketArray.Add(BuildingSocket);
-}
-
+ 
 void ABuildable_Base::InitializeMesh() const
 {
 	FCoreDelegates::OnBeginFrame.RemoveAll(this);
@@ -62,12 +59,25 @@ void ABuildable_Base::InitializeMesh() const
 
 void ABuildable_Base::GenerateSockets()
 {
+	TArray<UBuildableSocket*> Sockets;
+	
+	GetComponents<UBuildableSocket>(Sockets);
+	SocketArray = Sockets;
+
+	OnGenerateSockets();
+	
+	GEngine->AddOnScreenDebugMessage(0,1,FColor::Red, *FString::Printf(TEXT("%d"), SocketArray.Num()));
+}
+
+void ABuildable_Base::OnGenerateSockets()
+{
 }
 
 // Called every frame
 void ABuildable_Base::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	DrawDebugSocket();
 
 }
 
@@ -76,23 +86,23 @@ FGameplayTag ABuildable_Base::IF_GetBuildableTag_Implementation() const
 	return Tag;
 }
 
-TArray<FBuildingSocket> ABuildable_Base::IF_GetSocket_Implementation(ESocketConnectionType Type) const
+TArray<UBuildableSocket*> ABuildable_Base::IF_GetSocket_Implementation(ESocketConnectionType Type) const
 {
-	TArray<FBuildingSocket> SocketsOutput;
-	Algo::CopyIf(SocketArray, SocketsOutput, [Type](const FBuildingSocket& Socket)
+	TArray<UBuildableSocket*> SocketsOutput;
+	Algo::CopyIf(SocketArray, SocketsOutput, [&](const UBuildableSocket* Socket)
 	{
-		return Socket.AcceptedTypes.Contains(Type);
+		return Socket->GetAcceptedType().Contains(Type);
 	});
 
 	return SocketsOutput;
 }
 
-TArray<FBuildingSocket> ABuildable_Base::IF_GetAvailableSockets_Implementation()
+TArray<UBuildableSocket*> ABuildable_Base::IF_GetAvailableSockets_Implementation()
 {
-	TArray<FBuildingSocket> SocketsOutput;
-	Algo::CopyIf(SocketArray, SocketsOutput, [](const FBuildingSocket& Socket)
+	TArray<UBuildableSocket*> SocketsOutput;
+	Algo::CopyIf(SocketArray, SocketsOutput, [](const UBuildableSocket* Socket)
 	{
-		return !Socket.bIsOccupied;
+		return !Socket->IsOccupied();
 	});
 
 	return SocketsOutput;
@@ -103,13 +113,141 @@ UStaticMeshComponent* ABuildable_Base::IF_GetStaticMesh_Implementation() const
 	return BuildableMesh;
 }
 
-void ABuildable_Base::IF_SnapToSocket_Implementation(FBuildingSocket Socket)
+bool ABuildable_Base::IF_GetClosestSocket_Implementation(UBuildableSocket* OtherSocket, float MaxDistance,
+	UBuildableSocket*& OutSocket)
 {
-	ProcessSnappingPos(Socket);
+	return GetClosestSocket(OtherSocket,MaxDistance,OutSocket);
 }
+ 
 
-FVector ABuildable_Base::ProcessSnappingPos(FBuildingSocket Socket)
+FVector ABuildable_Base::ProcessSnappingPos(UBuildableSocket* Socket)
 {
 	return GetActorLocation();
 }
+
+void ABuildable_Base::SetIsPreviewBuild(bool bIsPreview)
+{
+	if (bIsPreview)
+	{
+		BoxComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		BoxComp->SetCollisionResponseToAllChannels(ECR_Ignore);
+		BuildableMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		BuildableMesh->SetCollisionResponseToAllChannels(ECR_Overlap);
+	}
+	else
+	{
+
+	}
+}
+
+void ABuildable_Base::DrawDebugSocket()
+{
+	for (TObjectPtr<UBuildableSocket> BuildableSocket : SocketArray)
+	{
+		DrawDebugSphere(GetWorld(), BuildableSocket->GetComponentLocation(),5.f,25,FColor::Red);
+	}
+}
+
+bool ABuildable_Base::GetClosestSocket(UBuildableSocket* OtherSocket,const float MaxDistance, UBuildableSocket*& OutSocket,
+	const TFunction<bool(UBuildableSocket*, UBuildableSocket*)>& Function)
+{
+	float BestDistance = MaxDistance;
+	bool bHasFound = false;
+	
+	for (UBuildableSocket* Socket : IBuildable::Execute_IF_GetAvailableSockets(this))
+	{
+		if (!OtherSocket->IsSocketCompatible(Socket))
+			continue;
+
+		
+		
+		if (const float Distance = FVector::Distance(OtherSocket->GetComponentLocation(), Socket->GetComponentLocation());
+			Distance < BestDistance && Function(OtherSocket,Socket))
+		{ 
+			BestDistance = Distance;
+			OutSocket = Socket;
+			bHasFound = true;
+		}		
+	}
+
+	return bHasFound;
+}
+
+
  
+
+bool ABuildable_Base::TrySnapToClosestBuildableSocket(ABuildable_Base* OtherBuilding, UBuildableSocket*& OutSocket,
+	UBuildableSocket*& OutOtherSocket, const TFunction<bool(UBuildableSocket*, UBuildableSocket*)>& Predicate)
+{
+	if (OtherBuilding == this)
+		return false;
+	
+	bool bHasFound = false;
+	float BestSnapDistance = TNumericLimits<int>::Max();
+
+	for (UBuildableSocket* Socket : Execute_IF_GetAvailableSockets(this))
+	{
+		UBuildableSocket* CompatibleSocket = nullptr;
+		
+		if (OtherBuilding->GetClosestSocket(Socket, BestSnapDistance,CompatibleSocket, Predicate))
+		{
+			OutSocket = Socket;
+			OutOtherSocket = CompatibleSocket;
+
+			BestSnapDistance = FVector::Distance(OutSocket->GetComponentLocation(), CompatibleSocket->GetComponentLocation());
+			bHasFound = true;
+		}
+	}
+	
+	return bHasFound;
+}
+
+FVector ABuildable_Base::GetSnapPosition(UBuildableSocket* Socket, UBuildableSocket* OtherSocket)
+{
+	if (!Socket || !OtherSocket)
+	{
+		return FVector::ZeroVector;
+	}
+
+	// Get world positions
+	FVector SocketWorldLocation = Socket->GetComponentLocation();
+	FVector OtherSocketWorldLocation = OtherSocket->GetComponentLocation();
+    
+	// Get the actor's current position
+	FVector ActorLocation = GetActorLocation();
+    
+	// Calculate the offset from actor to our socket
+	FVector OffsetToSocket = SocketWorldLocation - ActorLocation;
+    
+	// The new actor position should place our socket at the other socket's location
+	FVector NewActorLocation = OtherSocketWorldLocation - OffsetToSocket;
+    
+	return NewActorLocation;
+}
+
+
+FTransform ABuildable_Base::GetSnapTransform(UBuildableSocket* Socket, UBuildableSocket* OtherSocket)
+{
+	if (!Socket || !OtherSocket)
+	{
+		return FTransform::Identity;
+	}
+
+	// Get world transforms
+	FTransform SocketWorldTransform = Socket->GetComponentTransform();
+	FTransform OtherSocketWorldTransform = OtherSocket->GetComponentTransform();
+    
+	// Get the actor's current transform
+	FTransform ActorTransform = GetActorTransform();
+    
+	// Calculate the relative transform from actor to our socket
+	FTransform RelativeToActor = SocketWorldTransform.GetRelativeTransform(ActorTransform);
+    
+	// Calculate the new actor transform
+	// We want: NewActorTransform * RelativeToActor = OtherSocketWorldTransform
+	// So: NewActorTransform = OtherSocketWorldTransform * Inverse(RelativeToActor)
+	FTransform NewActorTransform = OtherSocketWorldTransform * RelativeToActor.Inverse();
+    
+	return NewActorTransform;
+}
+

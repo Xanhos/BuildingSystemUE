@@ -24,7 +24,7 @@ UBuildableManagerComponent::UBuildableManagerComponent()
 
 	bIsBuildModeActive = false;
 	CurrentBuildPreviewIndex = 0;
-	BuildPreviewComponent = nullptr;
+	BuildPreviewActor = nullptr;
 
 	// ...
 }
@@ -45,24 +45,39 @@ void UBuildableManagerComponent::UpdateAllBuildableTags()
 	BuildableTags = UBuildingSystemFL::FL_GetAllBuildableTags();
 }
 
+void UBuildableManagerComponent::DeInitializeBuildPreview()
+{
+	if (BuildPreviewActor)
+	{ 
+		GetWorld()->GetTimerManager().ClearTimer(BuildPreviewTraceTimer);
+		BuildPreviewTraceTimer.Invalidate();
+		BuildPreviewActor->Destroy();
+		BuildPreviewActor = nullptr;
+	}
+}
+
 void UBuildableManagerComponent::InitializeBuildPreview()
 {
 	AActor* Owner = GetOwner();
 
-	if (!BuildPreviewComponent)
+	if (!BuildPreviewActor)
 	{
-		BuildPreviewComponent = Cast<UStaticMeshComponent>(Owner->AddComponentByClass(UStaticMeshComponent::StaticClass(), false, {}, true));
-		if (BuildPreviewComponent)
+		bool bHasFoundRow = false;
+		FBuildableData Data = GetBuildableDataAtIndex(CurrentBuildPreviewIndex, bHasFoundRow);
+		if (bHasFoundRow)
 		{
-			BuildPreviewComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-			BuildPreviewComponent->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Overlap);
+			BuildPreviewActor = GetWorld()->SpawnActor<ABuildable_Base>(Data.Class);
+		}
+		 
+		if (BuildPreviewActor)
+		{
+			BuildPreviewActor->SetIsPreviewBuild(true);
 			BuildPreviewTrace(); 
-			BuildPreviewComponent->RegisterComponent();
-			BuildPreviewComponent->AttachToComponent(Owner->GetRootComponent(),
+			BuildPreviewActor->AttachToComponent(Owner->GetRootComponent(),
 				FAttachmentTransformRules::KeepWorldTransform);
+			ActivateBuildPreviewTrace();
 		}
 	}
-	UpdateBuildPreviewMeshByIndex(CurrentBuildPreviewIndex);
 }
 
 FBuildableData UBuildableManagerComponent::GetBuildableDataAtIndex(int Index, bool& HasFoundRow) const
@@ -116,59 +131,39 @@ void UBuildableManagerComponent::BuildPreviewTrace()
 		DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 1.f, 1.f);
 	}
 
+	SnappingSocketPair={};
 	FTransform LocationTransform{};
 	if (bHit)
 	{
+		auto SetupTransformForOverlapPreview = [this](UBuildableSocket* Socket, UBuildableSocket* OtherSocket){
+			FTransform NewTransform = BuildPreviewActor->GetSnapTransform( Socket,OtherSocket);
+			SetBuildPreviewTransform(NewTransform);
+			bool b=  !IsOverlappingBuildPreview();
+			return b;
+		};
 		IBuildable* Buildable = Cast<IBuildable>(HitResult.GetActor());
 		 
 		
 		if (Buildable && bSnappingIsActive)
 		{
-			auto SetupTransformForOverlapPreview = [this](const FVector& Pos)
+			UBuildableSocket* Socket = nullptr;
+			UBuildableSocket* OutSocket = nullptr;
+			if(BuildPreviewActor->TrySnapToClosestBuildableSocket(Cast<ABuildable_Base>(HitResult.GetActor()),Socket,OutSocket,SetupTransformForOverlapPreview))
 			{
-				FTransform NewTransform = BuildPreviewTransform;
-				NewTransform.SetLocation(Pos);
-				SetBuildPreviewTransform(NewTransform);
-			};
-			
-			FVector NewPos = HitResult.Location;
-			for (FBuildingSocket& Socket : Buildable->Execute_IF_GetSocket(HitResult.GetActor(), ))
-			{ 
-				if (NewPos == HitResult.Location)
-				{
-					SetupTransformForOverlapPreview(Socket.Position);
-					if (!IsOverlappingBuildPreview())
-					{
-						NewPos = Socket.Position;
-						SnappingSocket = Socket;
-					}
-					continue;
-				}
-				
-				if (FVector::Distance(Socket.Position, HitResult.Location) < FVector::Distance(HitResult.Location, NewPos))
-				{
-					SetupTransformForOverlapPreview(Socket.Position);
-					if (!IsOverlappingBuildPreview())
-					{
-						NewPos = Socket.Position;
-						SnappingSocket = Socket;
-					}					
-				}
+				SnappingSocketPair = {Socket, OutSocket};
+				LocationTransform = BuildPreviewActor->GetSnapTransform( Socket,OutSocket);
 			}
 			
-
-			LocationTransform.SetLocation(NewPos);			
 		}
 		else
 		{
-			LocationTransform.SetLocation(HitResult.Location);
-			SnappingSocket.Type = EBuildableSocketType::INVALID;
+			LocationTransform.SetLocation(HitResult.Location); 
 		}
 	}
 	else
 	{
 		LocationTransform.SetLocation(HitResult.TraceEnd);	
-		SnappingSocket.Type = EBuildableSocketType::INVALID;	
+			
 	}
 	SetBuildPreviewTransform(LocationTransform);
 
@@ -190,11 +185,10 @@ void UBuildableManagerComponent::ActivateBuildPreviewTrace()
 
 void UBuildableManagerComponent::SetBuildPreviewTransform(const FTransform& Transform)
 {
-	if (BuildPreviewComponent)
+	BuildPreviewTransform = Transform;
+	if (BuildPreviewActor)
 	{
-		BuildPreviewTransform = Transform;
-		BuildPreviewTransform.SetLocation(BuildPreviewTransform.GetLocation() + FVector(0, 0, BuildPreviewComponent->Bounds.BoxExtent.Z));
-		BuildPreviewComponent->SetWorldTransform(BuildPreviewTransform);
+		BuildPreviewActor->SetActorTransform(BuildPreviewTransform);
 	}
 }
 
@@ -205,16 +199,17 @@ void UBuildableManagerComponent::OnBuildPreviewTraceTick()
 
 void UBuildableManagerComponent::UpdateBuildPreviewValidity(EBuildPreviewStatus PreviewStatus)
 {
-	if (!BuildPreviewComponent)
+	if (!BuildPreviewActor)
 	{
 		return;
 	}
 
 	BuildStatus = PreviewStatus;
-	for (size_t i = 0; i < BuildPreviewComponent->GetNumMaterials(); i++)
+	UStaticMeshComponent* MeshComponent = IBuildable::Execute_IF_GetStaticMesh(BuildPreviewActor); 
+	for (size_t i = 0; i < MeshComponent->GetNumMaterials(); i++)
 	{
 		UMaterialInterface* Material = UBuildingSystemFL::FL_GetPreviewMaterial(PreviewStatus);
-		BuildPreviewComponent->SetMaterial(i, Material);
+		MeshComponent->SetMaterial(i, Material);
 	}
 }
 
@@ -280,7 +275,8 @@ void UBuildableManagerComponent::UpdateBuildPreviewMeshByIndex(int Index)
 	FBuildableData Data = GetBuildableDataAtIndex(Index, bHasFoundRow);
 	if (bHasFoundRow)
 	{
-		BuildPreviewComponent->SetStaticMesh(Data.Mesh);
+		DeInitializeBuildPreview();
+		InitializeBuildPreview();
 	}
 }
 
@@ -292,8 +288,8 @@ void UBuildableManagerComponent::SpawnBuild(TSubclassOf<AActor> ActorToSpawn)
 bool UBuildableManagerComponent::IsOverlappingBuildPreview()
 {
 	TArray<AActor*> OverlapActors;
-	BuildPreviewComponent->GetOverlappingActors(OverlapActors);
-	return !BuildPreviewComponent->GetOverlapInfos().IsEmpty();
+	BuildPreviewActor->GetOverlappingActors(OverlapActors);
+	return !OverlapActors.IsEmpty();
 }
 
 
@@ -331,16 +327,12 @@ void UBuildableManagerComponent::ActivateBuildMode()
 {
 	bIsBuildModeActive = true;
 	InitializeBuildPreview();
-	ActivateBuildPreviewTrace();
 }
 
 void UBuildableManagerComponent::DeActivateBuildMode()
 {
 	bIsBuildModeActive = false;
-	GetWorld()->GetTimerManager().ClearTimer(BuildPreviewTraceTimer);
-	BuildPreviewTraceTimer.Invalidate();
-	BuildPreviewComponent->DestroyComponent();
-	BuildPreviewComponent = nullptr;
+	DeInitializeBuildPreview();
 }
 
 void UBuildableManagerComponent::ToggleBuildMode()

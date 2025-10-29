@@ -11,49 +11,6 @@
  *
  */
 
-UENUM(BlueprintType)
-enum class ESocketConnectionType : uint8
-{
-	Ground,      
-	Vertical,    
-	Horizontal,  
-	Ceiling,     
-	Any          
-};
-
-USTRUCT(BlueprintType)
-struct FBuildingSocket
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere)
-	FTransform Transform;
-
-	UPROPERTY(EditAnywhere)
-	ESocketConnectionType Type;
-	
-	UPROPERTY(EditAnywhere)
-	TArray<ESocketConnectionType> AcceptedTypes;
-
-	UPROPERTY(EditAnywhere)
-	bool bIsOccupied = false;
-
-	UPROPERTY(EditAnywhere)
-	int Index = 0;
-
-	bool operator==(const FBuildingSocket& other) const
-	{
-		if (other.Type == ESocketConnectionType::Any || Type == ESocketConnectionType::Any)
-		{
-			return true;
-		}
-     
-		bool bAAcceptsB = other.AcceptedTypes.Contains(Type);
-		bool bBAcceptsA = AcceptedTypes.Contains(other.Type);
-    
-		return bAAcceptsB && bBAcceptsA;
-	}
-};
 
 
 UINTERFACE(Blueprintable)
@@ -71,15 +28,15 @@ public:
 	FGameplayTag IF_GetBuildableTag() const;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	TArray<FBuildingSocket> IF_GetSocket(ESocketConnectionType Type) const;
+	TArray<UBuildableSocket*> IF_GetSocket(ESocketConnectionType Type) const;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	UStaticMeshComponent* IF_GetStaticMesh() const;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void IF_SnapToSocket(int Index,FBuildingSocket Socket);
+	bool IF_GetClosestSocket(UBuildableSocket* OtherSocket, float MaxDistance, UBuildableSocket*& OutSocket);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	TArray<FBuildingSocket> IF_GetAvailableSockets();
+	TArray<UBuildableSocket*> IF_GetAvailableSockets();
  
 };
