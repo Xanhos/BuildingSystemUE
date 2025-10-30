@@ -41,7 +41,7 @@ protected:
 
 	virtual void OnGenerateSockets();
 
-	bool GetClosestSocket(UBuildableSocket* OtherSocket,const float MaxDistance ,UBuildableSocket*& OutSocket
+	bool GetClosestSocket(UBuildableSocket* OtherSocket,const float MaxDistance ,const FVector& AtLocation,UBuildableSocket*& OutSocket
 		, const TFunction<bool(UBuildableSocket*, UBuildableSocket*)>& Predicate = [](auto f, auto d){return true;});
 	
 public:
@@ -67,7 +67,7 @@ public:
 
 	void DrawDebugSocket();
  
-	bool TrySnapToClosestBuildableSocket(ABuildable_Base* OtherBuilding,  UBuildableSocket*& OutSocket, UBuildableSocket*& OutOtherSocket,
+	bool TrySnapToClosestBuildableSocket(ABuildable_Base* OtherBuilding, const FVector& AtLocation, UBuildableSocket*& OutSocket, UBuildableSocket*& OutOtherSocket,
 		const TFunction<bool(UBuildableSocket*, UBuildableSocket*)>& Predicate = [](auto f, auto d){return true;});
  
 	FVector GetSnapPosition(UBuildableSocket* Socket, UBuildableSocket* OtherSocket);

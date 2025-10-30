@@ -135,11 +135,12 @@ void UBuildableManagerComponent::BuildPreviewTrace()
 	FTransform LocationTransform{};
 	if (bHit)
 	{
+		LocationTransform.SetLocation(HitResult.Location);
+		
 		auto SetupTransformForOverlapPreview = [this](UBuildableSocket* Socket, UBuildableSocket* OtherSocket){
-			FTransform NewTransform = BuildPreviewActor->GetSnapTransform( Socket,OtherSocket);
+			FTransform NewTransform = BuildPreviewActor->GetSnapTransform(Socket,OtherSocket);
 			SetBuildPreviewTransform(NewTransform);
-			bool b=  !IsOverlappingBuildPreview();
-			return b;
+			return !IsOverlappingBuildPreview();
 		};
 		IBuildable* Buildable = Cast<IBuildable>(HitResult.GetActor());
 		 
@@ -148,16 +149,11 @@ void UBuildableManagerComponent::BuildPreviewTrace()
 		{
 			UBuildableSocket* Socket = nullptr;
 			UBuildableSocket* OutSocket = nullptr;
-			if(BuildPreviewActor->TrySnapToClosestBuildableSocket(Cast<ABuildable_Base>(HitResult.GetActor()),Socket,OutSocket,SetupTransformForOverlapPreview))
+			if(BuildPreviewActor->TrySnapToClosestBuildableSocket(Cast<ABuildable_Base>(HitResult.GetActor()), HitResult.Location,Socket,OutSocket,SetupTransformForOverlapPreview))
 			{
 				SnappingSocketPair = {Socket, OutSocket};
 				LocationTransform = BuildPreviewActor->GetSnapTransform( Socket,OutSocket);
-			}
-			
-		}
-		else
-		{
-			LocationTransform.SetLocation(HitResult.Location); 
+			}			
 		}
 	}
 	else

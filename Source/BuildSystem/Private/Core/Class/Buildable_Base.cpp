@@ -116,7 +116,7 @@ UStaticMeshComponent* ABuildable_Base::IF_GetStaticMesh_Implementation() const
 bool ABuildable_Base::IF_GetClosestSocket_Implementation(UBuildableSocket* OtherSocket, float MaxDistance,
 	UBuildableSocket*& OutSocket)
 {
-	return GetClosestSocket(OtherSocket,MaxDistance,OutSocket);
+	return GetClosestSocket(OtherSocket,MaxDistance,OtherSocket->GetComponentLocation(),OutSocket);
 }
  
 
@@ -148,7 +148,7 @@ void ABuildable_Base::DrawDebugSocket()
 	}
 }
 
-bool ABuildable_Base::GetClosestSocket(UBuildableSocket* OtherSocket,const float MaxDistance, UBuildableSocket*& OutSocket,
+bool ABuildable_Base::GetClosestSocket(UBuildableSocket* OtherSocket,const float MaxDistance, const FVector& AtLocation, UBuildableSocket*& OutSocket,
 	const TFunction<bool(UBuildableSocket*, UBuildableSocket*)>& Function)
 {
 	float BestDistance = MaxDistance;
@@ -161,7 +161,7 @@ bool ABuildable_Base::GetClosestSocket(UBuildableSocket* OtherSocket,const float
 
 		
 		
-		if (const float Distance = FVector::Distance(OtherSocket->GetComponentLocation(), Socket->GetComponentLocation());
+		if (const float Distance = FVector::Distance(AtLocation + OtherSocket->GetRelativeLocation(), Socket->GetComponentLocation());
 			Distance < BestDistance && Function(OtherSocket,Socket))
 		{ 
 			BestDistance = Distance;
@@ -176,7 +176,7 @@ bool ABuildable_Base::GetClosestSocket(UBuildableSocket* OtherSocket,const float
 
  
 
-bool ABuildable_Base::TrySnapToClosestBuildableSocket(ABuildable_Base* OtherBuilding, UBuildableSocket*& OutSocket,
+bool ABuildable_Base::TrySnapToClosestBuildableSocket(ABuildable_Base* OtherBuilding,const FVector& AtLocation, UBuildableSocket*& OutSocket,
 	UBuildableSocket*& OutOtherSocket, const TFunction<bool(UBuildableSocket*, UBuildableSocket*)>& Predicate)
 {
 	if (OtherBuilding == this)
@@ -189,12 +189,12 @@ bool ABuildable_Base::TrySnapToClosestBuildableSocket(ABuildable_Base* OtherBuil
 	{
 		UBuildableSocket* CompatibleSocket = nullptr;
 		
-		if (OtherBuilding->GetClosestSocket(Socket, BestSnapDistance,CompatibleSocket, Predicate))
+		if (OtherBuilding->GetClosestSocket(Socket, BestSnapDistance,AtLocation,CompatibleSocket, Predicate))
 		{
 			OutSocket = Socket;
 			OutOtherSocket = CompatibleSocket;
 
-			BestSnapDistance = FVector::Distance(OutSocket->GetComponentLocation(), CompatibleSocket->GetComponentLocation());
+			BestSnapDistance = FVector::Distance(AtLocation + OutSocket->GetRelativeLocation(), CompatibleSocket->GetComponentLocation());
 			bHasFound = true;
 		}
 	}
@@ -208,18 +208,14 @@ FVector ABuildable_Base::GetSnapPosition(UBuildableSocket* Socket, UBuildableSoc
 	{
 		return FVector::ZeroVector;
 	}
-
-	// Get world positions
+ 
 	FVector SocketWorldLocation = Socket->GetComponentLocation();
 	FVector OtherSocketWorldLocation = OtherSocket->GetComponentLocation();
-    
-	// Get the actor's current position
+     
 	FVector ActorLocation = GetActorLocation();
-    
-	// Calculate the offset from actor to our socket
+     
 	FVector OffsetToSocket = SocketWorldLocation - ActorLocation;
-    
-	// The new actor position should place our socket at the other socket's location
+     
 	FVector NewActorLocation = OtherSocketWorldLocation - OffsetToSocket;
     
 	return NewActorLocation;
@@ -232,22 +228,19 @@ FTransform ABuildable_Base::GetSnapTransform(UBuildableSocket* Socket, UBuildabl
 	{
 		return FTransform::Identity;
 	}
-
-	// Get world transforms
-	FTransform SocketWorldTransform = Socket->GetComponentTransform();
-	FTransform OtherSocketWorldTransform = OtherSocket->GetComponentTransform();
+	
+	FTransform OtherSocketWorld = OtherSocket->GetComponentTransform();
     
-	// Get the actor's current transform
-	FTransform ActorTransform = GetActorTransform();
+	// Flip 180° for face-to-face
+	FQuat Flip = FQuat(FVector::UpVector, PI);
+	FTransform FlipTransform(Flip);
+	FTransform OtherSocketFlipped = FlipTransform * OtherSocketWorld;
     
-	// Calculate the relative transform from actor to our socket
-	FTransform RelativeToActor = SocketWorldTransform.GetRelativeTransform(ActorTransform);
+	// Get socket transform RELATIVE TO ACTOR ROOT (not mesh!)
+	FTransform ActorWorld = GetActorTransform();
+	FTransform SocketWorld = Socket->GetComponentTransform();
+	FTransform SocketRelativeToActor = SocketWorld.GetRelativeTransform(ActorWorld);
     
-	// Calculate the new actor transform
-	// We want: NewActorTransform * RelativeToActor = OtherSocketWorldTransform
-	// So: NewActorTransform = OtherSocketWorldTransform * Inverse(RelativeToActor)
-	FTransform NewActorTransform = OtherSocketWorldTransform * RelativeToActor.Inverse();
-    
-	return NewActorTransform;
+	return OtherSocketFlipped * SocketRelativeToActor.Inverse();
 }
 
